@@ -46,6 +46,10 @@ class Inchoo_Shell_Precache extends Mage_Shell_Abstract
     protected $_precacheBaseUrl;
     protected $_precacheProductSuffix;
     protected $_precacheCategorySuffix;
+    
+    protected $_precacheMaxCategoryDepth = null;
+    protected $_precacheProductType = null;
+    protected $_precacheProductTypes = array('simple', 'configurable', 'virtual', 'bundle', 'downloadable');
 
     public function __construct() {
         parent::__construct();
@@ -79,6 +83,17 @@ class Inchoo_Shell_Precache extends Mage_Shell_Abstract
                 )
             );
         }
+        
+        if($this->getArg('catdepth') && intval($this->getArg('catdepth'))) {
+            $this->_precacheMaxCategoryDepth = intval($this->getArg('catdepth'));
+            
+        }
+        
+        if($this->getArg('prodtype') && in_array(strtolower($this->getArg('prodtype')), $this->_precacheProductTypes) ) {
+            $this->_precacheProductType = strtolower($this->getArg('prodtype'));
+            
+        }
+        
     }
 
     public function run() {
@@ -133,8 +148,10 @@ class Inchoo_Shell_Precache extends Mage_Shell_Abstract
         return <<<USAGE
 Usage:  php -f precache.php -- [options]
 
-  --stores <names>       Process only these stores (comma-separated)
-  --categories <names>   Process only these categories (comma-separated)
+  --stores <names>       	Process only these stores (comma-separated)
+  --categories <names>   	Process only these categories (comma-separated)
+  --catdepth <depth>	 	Process only to this depth of the category tree. Note 1 is root cat, 2 is top level etc.
+  --prodtype <product_type>	Process only this product type (simple, configurable, virtual etc)
 
   help                   This help
 
@@ -144,26 +161,24 @@ USAGE;
     protected function _precacheProcessStore($store)
     {
         $storeName = $store->getName();
-        $store_array = $this->_precacheStores;
         
-        foreach($store_array as $store_name)
-        {
-           if($store_name == $storeName): 
-            
-            printf('Processing "%s" store'."\n", $storeName);
-
+        if(!empty($this->_precacheStores) &&
+                !in_array($storeName, $this->_precacheStores)) {
+            continue;
+        }
+        
+        printf('Processing "%s" store'."\n", $storeName);
+        
         $this->_precacheSCount++;
-
+        
         Mage::app()->setCurrentStore($store->getId());
-
+        
         $rootCategory = Mage::getModel('catalog/category')
             ->load($store->getRootCategoryId());
-
+        
         $this->_precacheProcessCategory($rootCategory, $store);
-
+        
         echo "\n";
-           endif;  
-        }
         
     }
 
@@ -193,6 +208,10 @@ USAGE;
             ->addVisibleInCatalogFilterToCollection($productCollection);
         Mage::getSingleton('catalog/product_status')
             ->addVisibleFilterToCollection($productCollection);
+            
+        if(!empty($this->_precacheProductType)){
+			$productCollection->addAttributeToFilter('type_id', $this->_precacheProductType);
+		}    
 
         if(!($psize = $productCollection->getSize())) {
             printf('No enabled and visible in catalog products inside this category. Continue...'."\n", $categoryName);
@@ -220,6 +239,11 @@ USAGE;
                     )
                 ));
         }
+       
+        if(!empty($this->_precacheMaxCategoryDepth)){
+			$categoryCollection
+                ->addAttributeToFilter('level', array('lteq' => $this->_precacheMaxCategoryDepth));
+		}
 
         if(!($csize = $categoryCollection->getSize())) {
             echo 'No active subcategories match inside this category. Continue...'."\n";
