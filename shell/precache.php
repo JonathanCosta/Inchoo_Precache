@@ -148,7 +148,7 @@ class Inchoo_Shell_Precache extends Mage_Shell_Abstract
         return <<<USAGE
 Usage:  php -f precache.php -- [options]
 
-  --stores <names>       	Process only these stores (comma-separated)
+  --stores <names>       	Process only these stores (comma-separated store codes)
   --categories <names>   	Process only these categories (comma-separated)
   --catdepth <depth>	 	Process only to this depth of the category tree. Note 1 is root cat, 2 is top level etc.
   --prodtype <product_type>	Process only this product type (simple, configurable, virtual etc)
@@ -160,11 +160,11 @@ USAGE;
 
     protected function _precacheProcessStore($store)
     {
-        $storeName = $store->getName();
-        
+        $storeName = $store->getCode();
+                
         if(!empty($this->_precacheStores) &&
                 !in_array($storeName, $this->_precacheStores)) {
-            continue;
+            return;
         }
         
         printf('Processing "%s" store'."\n", $storeName);
@@ -192,7 +192,7 @@ USAGE;
         
         if($category->getId() !== $store->getRootCategoryId()) {
             $categoryUrl = $category->getUrl();
-
+		
             printf(
                 "\t".'Category URL: %s [%d]'."\n",
                 $categoryUrl,
@@ -322,7 +322,7 @@ USAGE;
     }
 
     protected function _precacheHttpRequest($url)
-    {
+    { 
         $client = new Zend_Http_Client($url, array('timeout' => 60));
 
         $response = $client->request();
