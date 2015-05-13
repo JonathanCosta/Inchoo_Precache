@@ -49,7 +49,9 @@ class Inchoo_Shell_Precache extends Mage_Shell_Abstract
     
     protected $_precacheMaxCategoryDepth = null;
     protected $_precacheProductType = null;
-    protected $_precacheProductTypes = array('simple', 'configurable', 'virtual', 'bundle', 'downloadable');
+    protected $_precacheProductTypes = array('simple', 'configurable', 'virtual', 'bundle', 'downloadable', 'none');
+    
+    protected $_precacheExcludeProducts = false;
 
     public function __construct() {
         parent::__construct();
@@ -91,7 +93,8 @@ class Inchoo_Shell_Precache extends Mage_Shell_Abstract
         
         if($this->getArg('prodtype') && in_array(strtolower($this->getArg('prodtype')), $this->_precacheProductTypes) ) {
             $this->_precacheProductType = strtolower($this->getArg('prodtype'));
-            
+            if($this->_precacheProductType == 'none')
+				$this->_precacheExcludeProducts = true;
         }
         
     }
@@ -151,7 +154,7 @@ Usage:  php -f precache.php -- [options]
   --stores <names>       	Process only these stores (comma-separated store codes)
   --categories <names>   	Process only these categories (comma-separated)
   --catdepth <depth>	 	Process only to this depth of the category tree. Note 1 is root cat, 2 is top level etc.
-  --prodtype <product_type>	Process only this product type (simple, configurable, virtual etc)
+  --prodtype <product_type>	Process only this product type (simple, configurable, virtual etc). Use 'none' to exclude all products 
 
   help                   This help
 
@@ -174,6 +177,7 @@ USAGE;
         Mage::app()->setCurrentStore($store->getId());
         
         $rootCategory = Mage::getModel('catalog/category')
+			->setStoreId($store->getId())
             ->load($store->getRootCategoryId());
         
         $this->_precacheProcessCategory($rootCategory, $store);
@@ -200,30 +204,34 @@ USAGE;
             );              
         }      
 
-        $productCollection = $category->getProductCollection()
-            ->addAttributeToSelect('name')
-            ->addAttributeToSelect('url_key');
+		if(!$this->_precacheExcludeProducts){
+			$productCollection = $category->getProductCollection()
+				->setStoreId($store->getId())
+				->addAttributeToSelect('name')
+				->addAttributeToSelect('url_key');
 
-        Mage::getSingleton('catalog/product_visibility')
-            ->addVisibleInCatalogFilterToCollection($productCollection);
-        Mage::getSingleton('catalog/product_status')
-            ->addVisibleFilterToCollection($productCollection);
-            
-        if(!empty($this->_precacheProductType)){
-			$productCollection->addAttributeToFilter('type_id', $this->_precacheProductType);
-		}    
+			Mage::getSingleton('catalog/product_visibility')
+				->addVisibleInCatalogFilterToCollection($productCollection);
+			Mage::getSingleton('catalog/product_status')
+				->addVisibleFilterToCollection($productCollection);
+				
+			if(!empty($this->_precacheProductType)){
+				$productCollection->addAttributeToFilter('type_id', $this->_precacheProductType);
+			}    
 
-        if(!($psize = $productCollection->getSize())) {
-            printf('No enabled and visible in catalog products inside this category. Continue...'."\n", $categoryName);
-        }
+			if(!($psize = $productCollection->getSize())) {
+				printf('No enabled and visible in catalog products inside this category. Continue...'."\n", $categoryName);
+			}
 
-        printf('Total product count inside this category is %d'."\n", $psize);
+			printf('Total product count inside this category is %d'."\n", $psize);
 
-        foreach ($productCollection as $product) {
-            $this->_precacheProcessProduct($product, $category, $store);
-        }
+			foreach ($productCollection as $product) {
+				$this->_precacheProcessProduct($product, $category, $store);
+			}
+		}
 
         $categoryCollection = Mage::getModel('catalog/category')
+			->setStoreId($store->getId())
             ->getCollection()
             ->addNameToResult()
             ->addUrlRewriteToResult()
