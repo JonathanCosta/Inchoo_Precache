@@ -47,6 +47,8 @@ class Inchoo_Shell_Precache extends Mage_Shell_Abstract
     protected $_precacheProductSuffix;
     protected $_precacheCategorySuffix;
     
+    protected $_precacheCategoryPages = 0;
+    
     protected $_precacheMaxCategoryDepth = null;
     protected $_precacheProductType = null;
     protected $_precacheProductTypes = array('simple', 'configurable', 'virtual', 'bundle', 'downloadable', 'none');
@@ -95,6 +97,11 @@ class Inchoo_Shell_Precache extends Mage_Shell_Abstract
             $this->_precacheProductType = strtolower($this->getArg('prodtype'));
             if($this->_precacheProductType == 'none')
 				$this->_precacheExcludeProducts = true;
+        }
+        
+        if($this->getArg('pages') && intval($this->getArg('pages'))) {
+            $this->_precacheCategoryPages = intval($this->getArg('pages'));
+            
         }
         
     }
@@ -154,7 +161,8 @@ Usage:  php -f precache.php -- [options]
   --stores <names>       	Process only these stores (comma-separated store codes)
   --categories <names>   	Process only these categories (comma-separated)
   --catdepth <depth>	 	Process only to this depth of the category tree. Note 1 is root cat, 2 is top level etc.
-  --prodtype <product_type>	Process only this product type (simple, configurable, virtual etc). Use 'none' to exclude all products 
+  --prodtype <product_type>	Process only this product type (simple, configurable, virtual etc). Use 'none' to exclude all products
+  --pages <numberofpages>	For category pages also traverse this many pages (i.e page 2, page 3 etc)
 
   help                   This help
 
@@ -201,7 +209,21 @@ USAGE;
                 "\t".'Category URL: %s [%d]'."\n",
                 $categoryUrl,
                 $this->_precacheHttpRequest($categoryUrl)
-            );              
+            );  
+            if($this->_precacheCategoryPages){
+				echo "caching additional {$this->_precacheCategoryPages} result pages\n";
+				for ($i=2; $i<=$this->_precacheCategoryPages; $i++){
+					
+					$subPage = $this->appendUrlParams($categoryUrl, array('p'=>$i));
+					printf(
+						"\t".'Additional result page URL: %s [%d]'."\n",
+						$subPage,
+						$this->_precacheHttpRequest($subPage)
+					);
+				}
+			}
+            
+            
         }      
 
 		if(!$this->_precacheExcludeProducts){
@@ -342,6 +364,28 @@ USAGE;
     {
         return (bool) Mage::getStoreConfig('web/url/use_store');
     }
+    
+    private function appendUrlParams($url, $params = array()){
+		
+		$tmp = parse_url($url);
+		
+		$get = array();
+		if(array_key_exists('query',$tmp)){
+			parse_str($tmp['query'],$get);
+			$get = array_merge($get, $params);			
+		}elseif(count($params)){
+			$get = $params;
+		}
+		foreach($get as $k=>$v){
+			$tmp['query'] .= "{$k}={$v}&";
+		}
+		$tmp['query'] = rtrim($tmp['query'], '&');
+				
+		$output = $tmp['scheme']."://".$tmp['host'].$tmp['path'];
+		if($tmp['query'])
+			$output .= '?'.$tmp['query'];
+		return $output;
+	}
 
 }
 
