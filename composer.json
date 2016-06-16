@@ -1,0 +1,15 @@
+{
+    "name": "hevelop/inchoo_precache",
+    "license": "OSL-3.0",
+    "type": "magento-module",
+    "description": "Inchoo Precache",
+    "require": {
+        "magento-hackathon/magento-composer-installer": "*"
+    },
+    "authors":[
+        {
+            "name":"Matteo Manfrin",
+            "email":"matteo@hevelop.com"
+        }
+    ]
+}
